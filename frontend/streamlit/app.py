@@ -3,23 +3,24 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+ROOT = Path(__file__).resolve().parents[2]
+SRC = ROOT / "src"
+for path in (ROOT, SRC):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
+
 import streamlit as st
 
-ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
-
+from frontend.streamlit.ui_helpers import (
+    GRID_SHAPES, PAPERS_MM, crop_frame_request, guide_preview, keep_ratio_from_height,
+    keep_ratio_from_width, layout_request, photo_export_key, sheet_export_key,
+)
 from photoscpec.interfaces.errors import PhotoScpecError
 from photoscpec.interfaces.models import (
-    CropRequest, DimensionsRequest, GuideRequest, PhotoExportRequest,
-    SheetExportRequest, ValidationRequest,
+    CropRequest, DimensionsRequest, GuideRequest, PhotoExportRequest, SheetExportRequest,
+    ValidationRequest,
 )
 from photoscpec.services.photoscpec_service import PhotoScpecService
-from frontend.ui_helpers import (
-    GRID_SHAPES, PAPERS_MM, crop_frame_request, guide_preview,
-    keep_ratio_from_height, keep_ratio_from_width, layout_request,
-)
 
 DISCLAIMER = "Requirements may change. Verify the latest official requirements before submission."
 GUIDE_NOTICE = ("Positioning guides are visual aids only. They do not certify biometric or "
@@ -32,52 +33,62 @@ def show_error(error: PhotoScpecError) -> None:
         st.caption(" · ".join(f"{key}: {value}" for key, value in error.details.items()))
 
 
-def service_instance() -> PhotoScpecService:
-    return PhotoScpecService()
+def note_text(notes) -> str:
+    if isinstance(notes, (list, tuple)):
+        return "\n".join(f"• {note}" for note in notes)
+    return str(notes)
+
+
+def printing_default(printing, key: str, fallback: float) -> float:
+    if isinstance(printing, dict):
+        return float(printing.get(key, fallback))
+    return fallback
 
 
 def dimensions_panel(service, specs):
     st.subheader("1. Photo size")
     countries = sorted({(s.country_id, s.country_name) for s in specs}, key=lambda pair: pair[1])
-    country_labels = ["Custom"] + [name for _, name in countries]
-    selected_country = st.selectbox("Country", country_labels)
+    selected_country = st.selectbox("Country", ["Custom"] + [name for _, name in countries])
     spec = None
     if selected_country != "Custom":
         country_id = next(identifier for identifier, name in countries if name == selected_country)
-        available = [s for s in specs if s.country_id == country_id]
-        labels = {f"{s.name} — {s.category}": s for s in available}
-        selected = st.selectbox("Document", list(labels))
-        spec = labels[selected]
-        dpi = st.selectbox("DPI", [150, 200, 300, 600],
-                           index=[150, 200, 300, 600].index(spec.default_dpi)
-                           if spec.default_dpi in [150, 200, 300, 600] else 2)
+        labels = {f"{s.name} — {s.category}": s for s in specs if s.country_id == country_id}
+        spec = labels[st.selectbox("Document", list(labels))]
+        if st.session_state.get("_defaults_spec_id") != spec.id:
+            st.session_state.dpi = spec.default_dpi
+            st.session_state.spacing_mm = printing_default(spec.printing, "spacing_mm", 2.0)
+            st.session_state._defaults_spec_id = spec.id
+        choices = sorted({150, 200, 300, 600, int(spec.default_dpi)})
+        dpi = st.selectbox("DPI", choices, key="dpi")
         request = DimensionsRequest(spec.width_mm, spec.height_mm, "mm", dpi)
-        st.caption(DISCLAIMER)
         if spec.notes:
-            st.info(spec.notes)
+            st.info(note_text(spec.notes))
     else:
         unit = st.selectbox("Unit", ["mm", "inch", "px"])
-        st.session_state.setdefault("custom_width", 35.0 if unit == "mm" else 1.0)
-        st.session_state.setdefault("custom_height", 45.0 if unit == "mm" else 1.0)
-        st.session_state.setdefault("custom_ratio",
-                                    st.session_state.custom_width / st.session_state.custom_height)
+        if st.session_state.get("_custom_unit") != unit:
+            neutral = 100.0 if unit == "px" else 1.0
+            st.session_state.custom_width = neutral
+            st.session_state.custom_height = neutral
+            st.session_state.custom_ratio = 1.0
+            st.session_state._custom_unit = unit
         st.checkbox("Maintain aspect ratio", key="maintain_ratio")
         left, right = st.columns(2)
         callback_width = keep_ratio_from_width if st.session_state.maintain_ratio else None
         callback_height = keep_ratio_from_height if st.session_state.maintain_ratio else None
         step = 1.0 if unit == "px" else 0.1
         with left:
-            st.number_input("Width", min_value=step, step=step, key="custom_width",
+            st.number_input("Width", min_value=None, step=step, key="custom_width",
                             on_change=callback_width, args=(st.session_state,))
         with right:
-            st.number_input("Height", min_value=step, step=step, key="custom_height",
+            st.number_input("Height", min_value=None, step=step, key="custom_height",
                             on_change=callback_height, args=(st.session_state,))
-        if not st.session_state.maintain_ratio:
+        if not st.session_state.maintain_ratio and st.session_state.custom_height:
             st.session_state.custom_ratio = (
                 st.session_state.custom_width / st.session_state.custom_height)
-        dpi = st.selectbox("DPI", [150, 200, 300, 600], index=2)
+        dpi = st.selectbox("DPI", [150, 200, 300, 600], index=2, key="custom_dpi")
         request = DimensionsRequest(float(st.session_state.custom_width),
                                     float(st.session_state.custom_height), unit, dpi)
+    st.caption(DISCLAIMER)
     dimensions = service.resolve_dimensions(request)
     st.write(f"Target: **{dimensions.width_mm:g} × {dimensions.height_mm:g} mm** · "
              f"**{dimensions.width_px} × {dimensions.height_px} px** at {dimensions.dpi} DPI")
@@ -86,23 +97,20 @@ def dimensions_panel(service, specs):
 
 def export_photo_controls(service, cropped, dpi):
     st.subheader("4. Download photo")
-    export_format = st.radio("Individual format", ["JPG", "PNG"], horizontal=True)
-    if st.button(f"Prepare {export_format} photo"):
-        try:
-            st.session_state.photo_export = service.export_photo(
-                PhotoExportRequest(cropped.image, export_format, dpi))
-        except PhotoScpecError as error:
-            show_error(error)
-    result = st.session_state.get("photo_export")
-    if result is not None:
+    image_format = st.radio("Individual format", ["JPG", "PNG"], horizontal=True)
+    current_key = photo_export_key(cropped.image, dpi, image_format)
+    if st.button(f"Prepare {image_format} photo"):
+        result = service.export_photo(PhotoExportRequest(cropped.image, image_format, dpi))
+        st.session_state.photo_export = (current_key, result)
+    saved = st.session_state.get("photo_export")
+    if saved is not None and saved[0] == current_key:
+        result = saved[1]
         st.download_button("Download individual photo", result.data, result.filename,
                            result.mime_type)
 
 
 def print_panel(service, cropped, dimensions, printing):
     st.subheader("5. Print sheet")
-    if printing:
-        st.caption(str(printing))
     copies = st.number_input("Copies", 1, 100, 4)
     paper_name = st.selectbox("Paper", [*PAPERS_MM, "Custom"])
     if paper_name == "Custom":
@@ -117,7 +125,9 @@ def print_panel(service, cropped, dimensions, printing):
         a, b = st.columns(2)
         rows = a.number_input("Rows", 1, 50, 2)
         columns = b.number_input("Columns", 1, 50, 2)
-    spacing = st.number_input("Spacing (mm)", 0.0, value=2.0)
+    default_spacing = printing_default(printing, "spacing_mm", 2.0)
+    st.session_state.setdefault("spacing_mm", default_spacing)
+    spacing = st.number_input("Spacing (mm)", 0.0, key="spacing_mm")
     margin = st.number_input("Margins (mm)", 0.0, value=3.0)
     cut_guides = st.checkbox("Cutting guides", value=True)
     orientation_label = st.selectbox("Paper orientation", ["Auto", "Portrait", "Landscape"])
@@ -126,20 +136,26 @@ def print_panel(service, cropped, dimensions, printing):
                              spacing, margin, grid, rows, columns, orientation)
     try:
         layout = service.calculate_layout(request)
+        st.caption(f"Page: {layout.paper_width_mm:g} × {layout.paper_height_mm:g} mm · "
+                   f"Capacity: {layout.capacity} · Spacing: {spacing:g} mm · "
+                   f"Margins: {margin:g} mm")
         st.write(f"{layout.rows} rows × {layout.columns} columns · "
                  f"{layout.copies_rendered}/{copies} copies · {layout.orientation}")
         for warning in layout.warnings:
             st.warning(warning)
-        preview_request = SheetExportRequest(cropped.image, request, "PNG", 100, cut_guides)
-        preview = service.export_sheet(preview_request)
+        preview = service.export_sheet(
+            SheetExportRequest(cropped.image, request, "PNG", 100, cut_guides))
         st.image(preview.data, caption="Print sheet preview")
-        sheet_format = st.radio("Sheet format", ["PDF", "JPG", "PNG"], horizontal=True)
-        if st.button(f"Prepare {sheet_format} sheet"):
-            st.session_state.sheet_export = service.export_sheet(
-                SheetExportRequest(cropped.image, request, sheet_format,
-                                   dimensions.dpi, cut_guides))
-        result = st.session_state.get("sheet_export")
-        if result is not None:
+        image_format = st.radio("Sheet format", ["PDF", "JPG", "PNG"], horizontal=True)
+        current_key = sheet_export_key(cropped.image, request, dimensions.dpi,
+                                       image_format, cut_guides)
+        if st.button(f"Prepare {image_format} sheet"):
+            result = service.export_sheet(SheetExportRequest(
+                cropped.image, request, image_format, dimensions.dpi, cut_guides))
+            st.session_state.sheet_export = (current_key, result)
+        saved = st.session_state.get("sheet_export")
+        if saved is not None and saved[0] == current_key:
+            result = saved[1]
             st.download_button("Download print sheet", result.data, result.filename,
                                result.mime_type)
     except PhotoScpecError as error:
@@ -152,17 +168,17 @@ def main() -> None:
     st.title("PhotoScpec")
     st.caption("Prepare document photos locally in this session.")
     try:
-        service = service_instance()
+        service = PhotoScpecService()
         for message in service.config_errors:
             st.warning(message)
-        specs = service.list_specs()
-        spec, dimensions = dimensions_panel(service, specs)
+        spec, dimensions = dimensions_panel(service, service.list_specs())
     except PhotoScpecError as error:
         show_error(error)
         return
-
     uploaded = st.file_uploader("2. Upload a JPG or PNG", type=["jpg", "jpeg", "png"])
     if uploaded is None:
+        st.session_state.pop("photo_export", None)
+        st.session_state.pop("sheet_export", None)
         st.info("Upload a photo to start cropping.")
         return
     source = uploaded.getvalue()
@@ -182,9 +198,8 @@ def main() -> None:
         crop = service.calculate_crop(frame)
         cropped = service.create_crop(CropRequest(source, crop, dimensions.width_px,
                                                   dimensions.height_px, rotation))
-        guides_on = st.checkbox("Show positioning guides")
         preview_bytes = cropped.image
-        if guides_on:
+        if st.checkbox("Show positioning guides"):
             guides = service.get_guides(GuideRequest(spec.id if spec else None))
             preview_bytes = guide_preview(cropped.image, guides.guides)
             st.caption(GUIDE_NOTICE)

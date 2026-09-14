@@ -1,7 +1,10 @@
 """Pure presentation helpers used by the Streamlit adapter."""
 from __future__ import annotations
 
+from dataclasses import asdict
+from hashlib import sha256
 from io import BytesIO
+import json
 from typing import MutableMapping
 
 from PIL import Image, ImageDraw
@@ -9,11 +12,8 @@ from PIL import Image, ImageDraw
 from photoscpec.interfaces.models import CropFrameRequest, Guide, LayoutRequest
 
 PAPERS_MM = {
-    "4 × 6 in": (101.6, 152.4),
-    "5 × 7 in": (127.0, 177.8),
-    "6 × 8 in": (152.4, 203.2),
-    "A4": (210.0, 297.0),
-    "Letter": (215.9, 279.4),
+    "4 × 6 in": (101.6, 152.4), "5 × 7 in": (127.0, 177.8),
+    "6 × 8 in": (152.4, 203.2), "A4": (210.0, 297.0), "Letter": (215.9, 279.4),
 }
 GRID_SHAPES = {
     "2 × 2": (2, 2), "2 × 3": (2, 3), "2 × 4": (2, 4),
@@ -34,33 +34,41 @@ def keep_ratio_from_height(state: MutableMapping[str, object]) -> None:
 
 
 def crop_frame_request(image: bytes, width_px: int, height_px: int, state) -> CropFrameRequest:
-    return CropFrameRequest(
-        image=image, output_width_px=width_px, output_height_px=height_px,
-        zoom=float(state["zoom"]), pan_x=float(state["pan_x"]), pan_y=float(state["pan_y"]),
-        rotation_degrees=int(state["rotation"]),
-    )
+    return CropFrameRequest(image=image, output_width_px=width_px, output_height_px=height_px,
+                            zoom=float(state["zoom"]), pan_x=float(state["pan_x"]),
+                            pan_y=float(state["pan_y"]),
+                            rotation_degrees=int(state["rotation"]))
 
 
 def layout_request(photo_width_mm: float, photo_height_mm: float, paper: tuple[float, float],
                    copies: int, spacing: float, margin: float, grid: str,
-                   rows: int | None, columns: int | None, orientation: str | None) -> LayoutRequest:
+                   rows: int | None, columns: int | None,
+                   orientation: str | None) -> LayoutRequest:
     if grid == "Auto":
         rows = columns = None
         mode = "auto"
     else:
         if grid in GRID_SHAPES:
             rows, columns = GRID_SHAPES[grid]
-        mode = "custom"
-    return LayoutRequest(
-        photo_width_mm=photo_width_mm, photo_height_mm=photo_height_mm,
-        paper_width_mm=paper[0], paper_height_mm=paper[1], copies=copies,
-        spacing_mm=spacing, margin_mm=margin, layout_mode=mode, orientation=orientation,
-        rows=rows, columns=columns, allow_rotate=True,
-    )
+        mode = "grid"
+    return LayoutRequest(photo_width_mm=photo_width_mm, photo_height_mm=photo_height_mm,
+                         paper_width_mm=paper[0], paper_height_mm=paper[1], copies=copies,
+                         spacing_mm=spacing, margin_mm=margin, layout_mode=mode,
+                         orientation=orientation, rows=rows, columns=columns, allow_rotate=True)
+
+
+def photo_export_key(image: bytes, dpi: int, image_format: str) -> str:
+    return f"{sha256(image).hexdigest()}:{dpi}:{image_format}"
+
+
+def sheet_export_key(image: bytes, layout: LayoutRequest, dpi: int, image_format: str,
+                     cutting_guides: bool) -> str:
+    encoded = json.dumps(asdict(layout), sort_keys=True, separators=(",", ":"))
+    return f"{sha256(image).hexdigest()}:{sha256(encoded.encode()).hexdigest()}:{dpi}:{image_format}:{cutting_guides}"
 
 
 def guide_preview(image_bytes: bytes, guides: list[Guide]) -> bytes:
-    """Draw normalized service guides onto a display-only copy."""
+    """Draw normalized guides onto a display copy; returned bytes are never exported."""
     with Image.open(BytesIO(image_bytes)) as source:
         image = source.convert("RGB")
     draw = ImageDraw.Draw(image)
@@ -76,7 +84,8 @@ def guide_preview(image_bytes: bytes, guides: list[Guide]) -> bytes:
             draw.line((x, 0, x, height), fill=color, width=stroke)
         elif None not in (guide.x, guide.y, guide.width, guide.height):
             box = (round(guide.x * width), round(guide.y * height),
-                   round((guide.x + guide.width) * width), round((guide.y + guide.height) * height))
+                   round((guide.x + guide.width) * width),
+                   round((guide.y + guide.height) * height))
             if guide.type in {"ellipse", "oval", "face"}:
                 draw.ellipse(box, outline=color, width=stroke)
             else:
