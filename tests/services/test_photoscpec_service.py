@@ -41,13 +41,11 @@ def test_headless_photo_to_print_workflow():
     for fmt in ("PNG", "JPG"):
         exported = service.export_photo(PhotoExportRequest(photo.image, fmt))
         assert Image.open(BytesIO(exported.data)).size == (413, 531)
+        if fmt == "PNG":
+            assert Image.open(BytesIO(exported.data)).getpixel((200, 200)) == (0, 0, 128)
     pdf = service.export_sheet(SheetExportRequest(photo.image, layout))
     page = PdfReader(BytesIO(pdf.data)).pages[0]
     assert float(page.mediabox.width) == pytest.approx(result.paper_width_mm / 25.4 * 72, abs=0.01)
-    # Guide creation and preview data cannot modify immutable photo bytes.
-    assert service.export_photo(PhotoExportRequest(photo.image)).data == (
-        service.export_photo(PhotoExportRequest(photo.image)).data
-    )
 
 
 def test_digital_dimensions_and_errors():

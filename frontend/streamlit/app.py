@@ -5,9 +5,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SRC = ROOT / "src"
-for path in (ROOT, SRC):
-    if str(path) not in sys.path:
-        sys.path.insert(0, str(path))
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(SRC))
 
 import streamlit as st
 
@@ -41,7 +40,8 @@ def note_text(notes) -> str:
 
 def printing_default(printing, key: str, fallback: float) -> float:
     if isinstance(printing, dict):
-        return float(printing.get(key, fallback))
+        value = printing.get(key)
+        return float(value) if value is not None else fallback
     return fallback
 
 
@@ -56,7 +56,7 @@ def dimensions_panel(service, specs):
         spec = labels[st.selectbox("Document", list(labels))]
         if st.session_state.get("_defaults_spec_id") != spec.id:
             st.session_state.dpi = spec.default_dpi
-            st.session_state.spacing_mm = printing_default(spec.printing, "spacing_mm", 2.0)
+            st.session_state.spacing_mm = printing_default(spec.printing, "preferred_spacing_mm", 2.0)
             st.session_state._defaults_spec_id = spec.id
         choices = sorted({150, 200, 300, 600, int(spec.default_dpi)})
         dpi = st.selectbox("DPI", choices, key="dpi")
@@ -125,7 +125,7 @@ def print_panel(service, cropped, dimensions, printing):
         a, b = st.columns(2)
         rows = a.number_input("Rows", 1, 50, 2)
         columns = b.number_input("Columns", 1, 50, 2)
-    default_spacing = printing_default(printing, "spacing_mm", 2.0)
+    default_spacing = printing_default(printing, "preferred_spacing_mm", 2.0)
     st.session_state.setdefault("spacing_mm", default_spacing)
     spacing = st.number_input("Spacing (mm)", 0.0, key="spacing_mm")
     margin = st.number_input("Margins (mm)", 0.0, value=3.0)

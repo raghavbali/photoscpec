@@ -77,3 +77,27 @@ def test_known_optional_types_and_head_region_bounds_are_validated(tmp_path: Pat
     result = load_specs(tmp_path)
     assert result.specs == []
     assert result.errors
+
+
+def test_nullable_schema_and_boolean_background(tmp_path):
+    (tmp_path / "optional.yaml").write_text(_document(
+        "  - id: optional\n"
+        "    photo: {width_mm: 35, height_mm: 45}\n"
+        "    face: {center_face: null}\n"
+        "    background: {preferred: white, required: true}\n"
+        "    guides:\n"
+        "      center_line: null\n"
+        "      head_region: {enabled: true, x: null, y: null, width: null, height: null}\n"
+    ))
+    result = load_specs(tmp_path)
+    assert not result.errors
+    assert result.specs[0].background["required"] is True
+
+
+def test_builtin_configs_and_generic_guides():
+    from photoscpec.core.guides import get_guides
+    root = Path(__file__).resolve().parents[2]
+    result = load_specs(root / "configs")
+    assert not result.errors
+    assert len(result.specs) >= 6
+    assert get_guides(None).guides

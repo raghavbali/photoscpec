@@ -11,9 +11,7 @@ def _line(enabled: bool, guide_id: str, position: float | None) -> Guide | None:
 
 def get_guides(spec: PhotoSpec | None) -> GuideResult:
     """Return top-left-origin normalized aids; these do not guarantee acceptance."""
-    if spec is None:
-        return GuideResult(guides=[])
-    data = spec.guides
+    data = spec.guides if spec is not None else {}
     if not data:
         return GuideResult(
             guides=[

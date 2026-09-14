@@ -21,14 +21,18 @@ def _positive(value: float, name: str) -> Decimal:
 def resolve_dimensions(request: DimensionsRequest) -> DimensionsResult:
     width = _positive(request.width, "width")
     height = _positive(request.height, "height")
-    if isinstance(request.dpi, bool) or not isinstance(request.dpi, int) or request.dpi <= 0:
-        raise PhotoScpecError("INVALID_DPI", "DPI must be a positive integer")
+    if isinstance(request.dpi, bool) or not isinstance(request.dpi, int) or not 1 <= request.dpi <= 2400:
+        raise PhotoScpecError("INVALID_DPI", "DPI must be an integer from 1 to 2400")
+    if not isinstance(request.unit, str):
+        raise PhotoScpecError("INVALID_DIMENSIONS", "Unit must be mm, inch, or px")
     unit = request.unit.lower()
     if unit == "mm":
         width_mm, height_mm = width, height
     elif unit in {"inch", "in"}:
         width_mm, height_mm = width * Decimal("25.4"), height * Decimal("25.4")
     elif unit == "px":
+        if width != width.to_integral_value() or height != height.to_integral_value():
+            raise PhotoScpecError("INVALID_DIMENSIONS", "Pixel dimensions must be whole numbers")
         width_mm = width * Decimal("25.4") / request.dpi
         height_mm = height * Decimal("25.4") / request.dpi
     else:

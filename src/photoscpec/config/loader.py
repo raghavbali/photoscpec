@@ -47,7 +47,7 @@ def _validate_optional(data: dict[str, Any]) -> None:
     for key in ("min_head_height_ratio", "max_head_height_ratio", "eye_line_ratio"):
         if key in face:
             _optional_ratio(face[key], f"face.{key}")
-    if "center_face" in face and not isinstance(face["center_face"], bool):
+    if face.get("center_face") is not None and not isinstance(face["center_face"], bool):
         raise ValueError("face.center_face must be a boolean")
     minimum = face.get("min_head_height_ratio")
     maximum = face.get("max_head_height_ratio")
@@ -55,18 +55,22 @@ def _validate_optional(data: dict[str, Any]) -> None:
         raise ValueError("face minimum head height cannot exceed maximum")
 
     background = _mapping(data, "background")
-    for key in ("preferred", "required"):
+    for key in ("preferred",):
         if key in background and background[key] is not None and not isinstance(
             background[key], str
         ):
             raise ValueError(f"background.{key} must be a string or null")
 
+    if background.get("required") is not None and not isinstance(background["required"], bool):
+        raise ValueError("background.required must be a boolean or null")
+
     guides = _mapping(data, "guides")
-    if "center_line" in guides and not isinstance(guides["center_line"], bool):
+    if guides.get("center_line") is not None and not isinstance(guides["center_line"], bool):
         raise ValueError("guides.center_line must be a boolean")
     eye = _mapping(guides, "eye_line")
     for key in ("crown_line", "chin_line"):
         item = _mapping(guides, key)
+        _optional_ratio(item.get("position_ratio"), f"guides.{key}.position_ratio")
         if "enabled" in item and not isinstance(item["enabled"], bool):
             raise ValueError(f"guides.{key}.enabled must be a boolean")
     if "enabled" in eye and not isinstance(eye["enabled"], bool):
@@ -77,10 +81,11 @@ def _validate_optional(data: dict[str, Any]) -> None:
     region = _mapping(guides, "head_region")
     if "enabled" in region and not isinstance(region["enabled"], bool):
         raise ValueError("guides.head_region.enabled must be a boolean")
+    defaults = {"x": 0.2, "y": 0.1, "width": 0.6, "height": 0.8}
     coordinates = []
     for key in ("x", "y", "width", "height"):
-        if key not in region:
-            continue
+        if region.get(key) is None:
+            region[key] = defaults[key]
         value = _number(region[key], f"guides.head_region.{key}")
         if not 0 <= value <= 1:
             raise ValueError(f"guides.head_region.{key} must be between 0 and 1")
@@ -148,7 +153,7 @@ def _parse_format(country: dict[str, str], data: Any) -> PhotoSpec:
     )
 
 
-def _parse_file(payload: Any) -> list[PhotoSpec]:
+def _parse_file(payload: Any) -> list[PhotoSpec | Exception]:
     if not isinstance(payload, dict):
         raise ValueError("document must be a mapping")
     raw_country = payload.get("country")

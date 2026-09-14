@@ -21,6 +21,9 @@ jobs:
         with:
           python-version: "3.12"
       - run: uv sync
+      - name: Capture initial dependency lock
+        if: runner.os == 'Linux'
+        run: uv run python -c 'import json,pathlib; print("PHOTOSCPEC_LOCK="+json.dumps(pathlib.Path("uv.lock").read_text()))'
       - run: uv run ruff check .
       - run: uv run python scripts/validate_configs.py
       - run: uv run pytest -q

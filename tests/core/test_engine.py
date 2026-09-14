@@ -153,3 +153,58 @@ def test_zero_spacing_guides_are_safely_skipped():
     result = export_sheet(request)
     with Image.open(BytesIO(result.data)) as image:
         assert image.size == (276, 177)
+
+
+def test_spacing_only_between_photos_exact_fit():
+    for mode in ("auto", "grid"):
+        layout = calculate_layout(LayoutRequest(
+            35, 45, 72, 45, 2, spacing_mm=2, margin_mm=0,
+            layout_mode=mode, rows=1, columns=2, orientation="landscape", allow_rotate=False))
+        assert layout.capacity == 2
+        assert layout.positions[-1].x_mm + 35 == pytest.approx(72)
+
+
+def test_pdf_placement_matrices_preserve_exact_dimensions_and_copy_count():
+    result = export_sheet(SheetExportRequest(
+        picture((413, 531)), LayoutRequest(35, 45, 210, 297, 7)))
+    page = PdfReader(BytesIO(result.data)).pages[0]
+    operations = page.get_contents().operations
+    matrices = [args for args, op in operations if op == b"cm" and float(args[0]) > 1]
+    assert sum(op == b"Do" for _, op in operations) == 7
+    assert len(matrices) == 7
+    for matrix in matrices:
+        assert sorted([float(matrix[0]), float(matrix[3])]) == pytest.approx(
+            sorted([35 * 72 / 25.4, 45 * 72 / 25.4]), abs=0.001)
+
+
+def test_raster_cut_guides_never_change_photo_pixels():
+    from dataclasses import replace
+    request = SheetExportRequest(
+        picture((350, 450)), LayoutRequest(35, 45, 101.6, 152.4, 2),
+        format="PNG", dpi=100, cutting_guides=False)
+    clean = Image.open(BytesIO(export_sheet(request).data))
+    marked = Image.open(BytesIO(export_sheet(replace(request, cutting_guides=True)).data))
+    assert clean.tobytes() != marked.tobytes()
+    for p in calculate_layout(request.layout).positions:
+        bounds = tuple(int(v * 100 / 25.4 + 0.5) for v in
+                       (p.x_mm, p.y_mm, p.x_mm + p.width_mm, p.y_mm + p.height_mm))
+        assert clean.crop(bounds).tobytes() == marked.crop(bounds).tobytes()
+
+
+def test_exif_rotation_and_export_metadata_stripping():
+    image = Image.new("RGB", (80, 40), "red")
+    exif = Image.Exif()
+    exif[274] = 6
+    exif[315] = "private author"
+    data = BytesIO()
+    image.save(data, "JPEG", exif=exif)
+    info = inspect_image(data.getvalue())
+    assert (info.width_px, info.height_px) == (40, 80)
+    exported = export_photo(PhotoExportRequest(data.getvalue(), "JPG"))
+    assert not Image.open(BytesIO(exported.data)).getexif()
+
+
+def test_fractional_pixels_and_unknown_unit_are_rejected():
+    for request in (DimensionsRequest(630.5, 810, "px"), DimensionsRequest(1, 1, "cm")):
+        with pytest.raises(PhotoScpecError):
+            resolve_dimensions(request)

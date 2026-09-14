@@ -3,19 +3,19 @@ country:
   id: IN
   name: India
 formats:
-  - id: india-passport-51x51
+  - id: india_passport
     name: India passport photo (51 x 51 mm template)
     category: passport
     photo: {width_mm: 51, height_mm: 51, default_dpi: 300}
     notes: [Preparation template; acceptance is determined by the receiving authority.]
     source: {authority: null, url: null, last_verified: null}
-  - id: india-oci-51x51
+  - id: india_oci
     name: India OCI photo (51 x 51 mm template)
     category: oci
     photo: {width_mm: 51, height_mm: 51, default_dpi: 300}
     notes: [Preparation template; acceptance is determined by the receiving authority.]
     source: {authority: null, url: null, last_verified: null}
-  - id: india-birth-registration-35x45
+  - id: india_birth_registration
     name: India birth registration photo (35 x 45 mm template)
     category: birth-registration
     photo: {width_mm: 35, height_mm: 45, default_dpi: 300}

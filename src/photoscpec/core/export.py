@@ -110,7 +110,7 @@ def export_sheet(request: SheetExportRequest) -> ExportResult:
         raise PhotoScpecError("EXPORT_FAILED", "Sheet format must be PDF, PNG, or JPG")
     width_px = int(math.floor(layout.paper_width_mm * request.dpi / 25.4 + 0.5))
     height_px = int(math.floor(layout.paper_height_mm * request.dpi / 25.4 + 0.5))
-    if width_px * height_px > MAX_SHEET_PIXELS:
+    if min(width_px, height_px) < 1 or width_px * height_px > MAX_SHEET_PIXELS:
         raise PhotoScpecError("EXPORT_FAILED", "Raster sheet exceeds the pixel limit")
     sheet = Image.new("RGB", (width_px, height_px), "white")
     rectangles = []
@@ -122,6 +122,8 @@ def export_sheet(request: SheetExportRequest) -> ExportResult:
                                * request.dpi / 25.4 + 0.5))
         bottom = int(math.floor((placement.y_mm + placement.height_mm)
                                 * request.dpi / 25.4 + 0.5))
+        if right <= left or bottom <= top:
+            raise PhotoScpecError("EXPORT_FAILED", "Photo is smaller than one output pixel")
         rendered = rendered.resize((right-left, bottom-top), Image.Resampling.LANCZOS)
         sheet.paste(rendered, (left, top))
         rectangles.append((left, top, right, bottom))
@@ -129,12 +131,13 @@ def export_sheet(request: SheetExportRequest) -> ExportResult:
     if guide_px > 0:
         draw = ImageDraw.Draw(sheet)
         for left, top, right, bottom in rectangles:
-            draw.line((left-guide_px, top, left, top), fill="black")
-            draw.line((left, top-guide_px, left, top), fill="black")
+            draw.line((left-guide_px, top, left-1, top), fill="black")
+            draw.line((left, top-guide_px, left, top-1), fill="black")
             draw.line((right, top-guide_px, right, top), fill="black")
             draw.line((right, top, right+guide_px, top), fill="black")
             draw.line((left-guide_px, bottom, left, bottom), fill="black")
             draw.line((left, bottom, left, bottom+guide_px), fill="black")
             draw.line((right, bottom, right+guide_px, bottom), fill="black")
             draw.line((right, bottom, right, bottom+guide_px), fill="black")
-    return _encode(sheet, fmt, request.dpi)
+    encoded = _encode(sheet, fmt, request.dpi)
+    return ExportResult(encoded.data, encoded.mime_type, "photo-sheet." + encoded.filename.split(".")[-1])
