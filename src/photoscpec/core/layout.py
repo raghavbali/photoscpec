@@ -7,7 +7,7 @@ from photoscpec.interfaces.models import LayoutRequest, LayoutResult, PhotoPlace
 
 def _finite_nonnegative(value: float, name: str, positive: bool = False) -> None:
     if not math.isfinite(value) or value < 0 or (positive and value == 0):
-        raise PhotoScpecError("invalid_layout", f"{name} is invalid", {"field": name})
+        raise PhotoScpecError("INVALID_DIMENSIONS", f"{name} is invalid", {"field": name})
 
 
 def _capacity(pw, ph, fw, fh, margin, spacing):
@@ -30,15 +30,15 @@ def calculate_layout(request: LayoutRequest) -> LayoutResult:
     ):
         _finite_nonnegative(value, name, positive)
     if isinstance(request.copies, bool) or not isinstance(request.copies, int) or request.copies <= 0:
-        raise PhotoScpecError("invalid_layout", "copies must be a positive integer")
+        raise PhotoScpecError("INVALID_DIMENSIONS", "copies must be a positive integer")
     if request.copies > 10_000:
-        raise PhotoScpecError("resource_limit", "copies exceed the layout limit")
+        raise PhotoScpecError("INVALID_DIMENSIONS", "copies exceed the layout limit")
     if request.layout_mode not in {"auto", "grid"}:
-        raise PhotoScpecError("invalid_layout", "layout_mode must be auto or grid")
+        raise PhotoScpecError("INVALID_DIMENSIONS", "layout_mode must be auto or grid")
     if request.orientation not in {None, "portrait", "landscape"}:
-        raise PhotoScpecError("invalid_layout", "orientation must be portrait or landscape")
+        raise PhotoScpecError("INVALID_DIMENSIONS",
+                              "orientation must be portrait or landscape")
 
-    papers = []
     if request.orientation == "portrait":
         papers = [("portrait", min(request.paper_width_mm, request.paper_height_mm),
                    max(request.paper_width_mm, request.paper_height_mm))]
@@ -66,7 +66,8 @@ def calculate_layout(request: LayoutRequest) -> LayoutResult:
                         or not isinstance(request.columns, int)
                         or isinstance(request.columns, bool)
                         or request.rows <= 0 or request.columns <= 0):
-                    raise PhotoScpecError("invalid_layout", "Grid rows and columns must be positive")
+                    raise PhotoScpecError("INVALID_DIMENSIONS",
+                                          "Grid rows and columns must be positive")
                 rows, columns = request.rows, request.columns
                 need_w = columns * fw + (columns - 1) * request.spacing_mm
                 need_h = rows * fh + (rows - 1) * request.spacing_mm
@@ -78,10 +79,11 @@ def calculate_layout(request: LayoutRequest) -> LayoutResult:
     viable = [candidate for candidate in candidates if candidate[0] >= request.copies]
     maximum = max((candidate[0] for candidate in candidates), default=0)
     if not viable:
-        raise PhotoScpecError("insufficient_capacity",
+        raise PhotoScpecError("LAYOUT_DOES_NOT_FIT",
                               "Requested copies do not fit without shrinking",
                               {"requested": request.copies, "maximum_capacity": maximum})
-    chosen = min(viable, key=lambda c: (c[0], c[1] * c[2], c[6], c[3] == "landscape"))
+    chosen = min(viable, key=lambda candidate: (
+        -candidate[0], candidate[6], candidate[3] == "landscape"))
     capacity, rows, columns, orientation, pw, ph, rotated, fw, fh = chosen
     grid_w = columns * fw + (columns - 1) * request.spacing_mm
     grid_h = rows * fh + (rows - 1) * request.spacing_mm
