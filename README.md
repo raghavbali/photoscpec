@@ -51,7 +51,7 @@ uv run python scripts/validate_configs.py
 uv run pytest -q
 ```
 
-CI runs the same checks on Linux and macOS with Python 3.12. uv creates an isolated .venv and a resolved uv.lock; retain the lock when installing locally. Dependency version ranges live in pyproject.toml.
+CI runs the same checks on Linux and macOS with Python 3.12. uv creates an isolated .venv using the committed uv.lock. CI checks the lock with uv sync --locked. To update dependencies intentionally, run uv lock --upgrade and review/test the lockfile changes.
 
 Backend code is in src/photoscpec; only frontend/streamlit imports Streamlit. YAML specifications load dynamically from configs. No HTTP server or database is required.
 

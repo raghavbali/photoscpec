@@ -40,10 +40,10 @@ def test_canonical_toggles_are_honored():
     ]
 
 
-def test_custom_spec_gets_generic_composition_aids_but_none_gets_none():
+def test_custom_spec_and_none_get_generic_composition_aids():
     assert [guide.id for guide in get_guides(_spec()).guides] == [
         "generic-composition-center",
         "generic-composition-eye-line",
         "generic-composition-head-region",
     ]
-    assert get_guides(None).guides == []
+    assert get_guides(None).guides == get_guides(_spec()).guides
