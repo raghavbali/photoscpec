@@ -1,0 +1,17 @@
+# Preparation templates only; verify current receiving-authority requirements.
+country:
+  id: US
+  name: United States
+formats:
+  - id: usa-passport-2x2
+    name: USA passport photo (2 x 2 inch template)
+    category: passport
+    photo: {width_mm: 50.8, height_mm: 50.8, default_dpi: 300}
+    notes: [Preparation template; acceptance is determined by the receiving authority.]
+    source: {authority: null, url: null, last_verified: null}
+  - id: usa-visa-2x2
+    name: USA visa photo (2 x 2 inch template)
+    category: visa
+    photo: {width_mm: 50.8, height_mm: 50.8, default_dpi: 300}
+    notes: [Preparation template; acceptance is determined by the receiving authority.]
+    source: {authority: null, url: null, last_verified: null}
