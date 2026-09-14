@@ -14,8 +14,8 @@ def _capacity(pw, ph, fw, fh, margin, spacing):
     usable_w, usable_h = pw - 2 * margin, ph - 2 * margin
     if usable_w < fw or usable_h < fh:
         return 0, 0, 0
-    columns = int(math.floor((usable_w + spacing + 1e-9) / (fw + spacing)))
-    rows = int(math.floor((usable_h + spacing + 1e-9) / (fh + spacing)))
+    columns = int(math.floor((usable_w + 1e-9) / (fw + spacing)))
+    rows = int(math.floor((usable_h + 1e-9) / (fh + spacing)))
     return rows * columns, rows, columns
 
 
@@ -69,8 +69,8 @@ def calculate_layout(request: LayoutRequest) -> LayoutResult:
                     raise PhotoScpecError("INVALID_DIMENSIONS",
                                           "Grid rows and columns must be positive")
                 rows, columns = request.rows, request.columns
-                need_w = columns * fw + (columns - 1) * request.spacing_mm
-                need_h = rows * fh + (rows - 1) * request.spacing_mm
+                need_w = columns * (fw + request.spacing_mm)
+                need_h = rows * (fh + request.spacing_mm)
                 capacity = rows * columns if (
                     need_w <= pw - 2 * request.margin_mm + 1e-9
                     and need_h <= ph - 2 * request.margin_mm + 1e-9) else 0
