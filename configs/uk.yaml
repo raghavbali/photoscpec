@@ -1,0 +1,13 @@
+id: uk-passport-35x45
+name: UK passport photo (35 x 45 mm template)
+category: passport
+country_id: GB
+country_name: United Kingdom
+width_mm: 35
+height_mm: 45
+default_dpi: 300
+notes:
+  - Preparation template; acceptance is determined by the receiving authority.
+source:
+  urls: []
+  last_verified: null
