@@ -3,52 +3,77 @@ from pathlib import Path
 from photoscpec.config import load_specs
 
 
-def test_loads_multiple_countries_and_yaml_extensions(tmp_path: Path):
+def _document(format_body: str, country: str = "AA") -> str:
+    return f"country:\n  id: {country}\nformats:\n{format_body}"
+
+
+def test_loads_canonical_schema_and_defaults(tmp_path: Path):
     (tmp_path / "a.yaml").write_text(
-        "id: a\nname: A\ncategory: passport\ncountry_id: AA\n"
-        "country_name: Alpha\nwidth_mm: 35\nheight_mm: 45\ndefault_dpi: 300\n"
+        _document("  - id: a\n    photo: {width_mm: 35, height_mm: 45}\n")
     )
     (tmp_path / "b.yml").write_text(
-        "id: b\nname: B\ncategory: visa\ncountry_id: BB\n"
-        "country_name: Beta\nwidth_mm: 50.8\nheight_mm: 50.8\ndefault_dpi: 300\n"
+        _document(
+            "  - id: b\n    name: Visa B\n    category: visa\n"
+            "    photo: {width_mm: 50.8, height_mm: 50.8, default_dpi: 600}\n",
+            "BB",
+        )
     )
     result = load_specs(tmp_path)
-    assert [spec.id for spec in result.specs] == ["a", "b"]
+    assert [(s.id, s.name, s.category, s.default_dpi) for s in result.specs] == [
+        ("a", "a", "custom", 300),
+        ("b", "Visa B", "visa", 600),
+    ]
+    assert result.specs[0].country_name == "AA"
     assert result.errors == []
 
 
-def test_malformed_file_does_not_hide_valid_file(tmp_path: Path):
-    (tmp_path / "bad.yaml").write_text("specifications: [")
+def test_malformed_yaml_and_invalid_encoding_do_not_hide_valid_file(tmp_path: Path):
+    (tmp_path / "bad.yaml").write_text("formats: [")
+    (tmp_path / "encoding.yml").write_bytes(b"\xff\xfe")
     (tmp_path / "good.yaml").write_text(
-        "id: good\nname: Good\ncategory: passport\ncountry_id: AA\n"
-        "country_name: Alpha\nwidth_mm: 35\nheight_mm: 45\ndefault_dpi: 300\n"
+        _document("  - id: good\n    photo: {width_mm: 35, height_mm: 45}\n")
     )
     result = load_specs(tmp_path)
     assert [spec.id for spec in result.specs] == ["good"]
-    assert len(result.errors) == 1
+    assert len(result.errors) == 2
 
 
-def test_duplicate_id_is_deterministic_and_keeps_first(tmp_path: Path):
-    base = (
-        "id: same\ncategory: passport\ncountry_id: AA\ncountry_name: Alpha\n"
-        "width_mm: 35\nheight_mm: 45\ndefault_dpi: 300\n"
-    )
-    (tmp_path / "a.yaml").write_text("name: First\n" + base)
-    (tmp_path / "b.yaml").write_text("name: Second\n" + base)
+def test_duplicate_id_keeps_first_by_filename(tmp_path: Path):
+    item = "  - id: same\n    photo: {width_mm: 35, height_mm: 45}\n"
+    (tmp_path / "a.yaml").write_text(_document(item, "FIRST"))
+    (tmp_path / "b.yaml").write_text(_document(item, "SECOND"))
     result = load_specs(tmp_path)
-    assert [spec.name for spec in result.specs] == ["First"]
+    assert result.specs[0].country_id == "FIRST"
     assert "duplicate id" in result.errors[0]
 
 
-def test_invalid_optional_metadata_rejects_only_that_entry(tmp_path: Path):
+def test_invalid_optional_format_does_not_hide_valid_sibling(tmp_path: Path):
     (tmp_path / "mixed.yaml").write_text(
-        "specifications:\n"
-        "  - {id: bad, name: Bad, category: passport, country_id: AA, "
-        "country_name: Alpha, width_mm: 35, height_mm: 45, default_dpi: 300, "
-        "face: {head_height_min_ratio: 0.8, head_height_max_ratio: 0.7}}\n"
-        "  - {id: good, name: Good, category: passport, country_id: AA, "
-        "country_name: Alpha, width_mm: 35, height_mm: 45, default_dpi: 300}\n"
+        _document(
+            "  - id: bad\n"
+            "    photo: {width_mm: 35, height_mm: 45}\n"
+            "    face: {min_head_height_ratio: 0.8, max_head_height_ratio: 0.7}\n"
+            "  - id: good\n"
+            "    photo: {width_mm: 35, height_mm: 45}\n"
+            "    future_field: {allowed: true}\n"
+        )
     )
     result = load_specs(tmp_path)
     assert [spec.id for spec in result.specs] == ["good"]
     assert len(result.errors) == 1
+
+
+def test_known_optional_types_and_head_region_bounds_are_validated(tmp_path: Path):
+    (tmp_path / "bad.yaml").write_text(
+        _document(
+            "  - id: bad\n"
+            "    photo: {width_mm: 35, height_mm: 45}\n"
+            "    guides:\n"
+            "      center_line: yes\n"
+            "      head_region: {enabled: true, x: 0.8, y: 0.1, width: 0.3, height: 0.5}\n"
+            "    source: {url: [not-a-string]}\n"
+        )
+    )
+    result = load_specs(tmp_path)
+    assert result.specs == []
+    assert result.errors

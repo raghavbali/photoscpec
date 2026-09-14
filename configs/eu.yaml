@@ -1,13 +1,10 @@
-id: eu-generic-35x45
-name: Generic EU document photo (35 x 45 mm template)
-category: generic
-country_id: EU
-country_name: European Union
-width_mm: 35
-height_mm: 45
-default_dpi: 300
-notes:
-  - Generic preparation template only; requirements vary by country and document.
-source:
-  urls: []
-  last_verified: null
+country:
+  id: EU
+  name: European Union
+formats:
+  - id: eu-generic-35x45
+    name: Generic EU document photo (35 x 45 mm template)
+    category: generic
+    photo: {width_mm: 35, height_mm: 45, default_dpi: 300}
+    notes: [Generic preparation template only; requirements vary by country and document.]
+    source: {authority: null, url: null, last_verified: null}
