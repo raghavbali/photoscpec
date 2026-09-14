@@ -106,11 +106,14 @@ def test_four_by_six_layout_supported_counts(copies):
     assert layout.capacity >= copies
 
 
-def test_geometric_capacity_is_six_not_eight():
+def test_geometric_capacity_is_eight_in_landscape():
+    layout = calculate_layout(LayoutRequest(35, 45, 101.6, 152.4, 8))
+    assert layout.capacity == len(layout.positions) == 8
+    assert layout.orientation == "landscape"
     with pytest.raises(PhotoScpecError) as exc:
-        calculate_layout(LayoutRequest(35, 45, 101.6, 152.4, 8))
+        calculate_layout(LayoutRequest(35, 45, 101.6, 152.4, 9))
     assert exc.value.code == "LAYOUT_DOES_NOT_FIT"
-    assert exc.value.details["maximum_capacity"] == 6
+    assert exc.value.details["maximum_capacity"] == 8
 
 
 @pytest.mark.parametrize("copies", [7, 8, 12, 16])
@@ -134,8 +137,8 @@ def test_pdf_physical_page_geometry_and_single_page():
     reader = PdfReader(BytesIO(result.data))
     assert len(reader.pages) == 1
     page = reader.pages[0]
-    assert float(page.mediabox.width) == pytest.approx(101.6 * 72 / 25.4, abs=.02)
-    assert float(page.mediabox.height) == pytest.approx(152.4 * 72 / 25.4, abs=.02)
+    assert float(page.mediabox.width) == pytest.approx(152.4 * 72 / 25.4, abs=.02)
+    assert float(page.mediabox.height) == pytest.approx(101.6 * 72 / 25.4, abs=.02)
 
 
 def test_sheet_rejects_unrelated_aspect():

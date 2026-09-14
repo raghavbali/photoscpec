@@ -20,6 +20,8 @@ GUIDE_NOTICE = ("Positioning guides are visual aids only. They do not certify bi
 
 def show_error(error: PhotoScpecError) -> None:
     st.error(str(error))
+    if error.code == "LAYOUT_DOES_NOT_FIT":
+        st.info("Choose fewer copies, reduce spacing or margins, or select larger paper.")
     if error.details:
         st.caption(" · ".join(f"{key}: {value}" for key, value in error.details.items()))
 
@@ -40,7 +42,8 @@ def printing_default(printing, key: str, fallback: float) -> float:
 def dimensions_panel(service, specs):
     st.subheader("1. Photo size")
     countries = sorted({(s.country_id, s.country_name) for s in specs}, key=lambda pair: pair[1])
-    selected_country = st.selectbox("Country", ["Custom"] + [name for _, name in countries])
+    selected_country = st.selectbox("Country", ["Custom"] + [name for _, name in countries],
+                                    index=1 if countries else 0)
     spec = None
     if selected_country != "Custom":
         country_id = next(identifier for identifier, name in countries if name == selected_country)

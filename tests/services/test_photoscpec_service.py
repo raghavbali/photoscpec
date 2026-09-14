@@ -56,7 +56,7 @@ def test_digital_dimensions_and_errors():
         service.get_spec("does-not-exist")
     assert error.value.code == "SPEC_NOT_FOUND"
     with pytest.raises(PhotoScpecError) as error:
-        service.calculate_layout(LayoutRequest(35, 45, 101.6, 152.4, copies=8))
+        service.calculate_layout(LayoutRequest(35, 45, 101.6, 152.4, copies=9))
     assert error.value.code == "LAYOUT_DOES_NOT_FIT"
 
 

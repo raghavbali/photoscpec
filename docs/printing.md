@@ -15,4 +15,4 @@ Pixels are rounded consistently half-up: floor(positive value + 0.5). Thus 35 ×
 
 Copy count is independent of capacity. A page that holds eight with seven requested contains seven photos. Fixed grids are rows × columns and must fit in full, even if fewer copies are requested. Auto fit compares uniform grids; mixed portrait/landscape packing and multiple pages are intentionally excluded.
 
-Insufficient-capacity errors mean choose fewer copies, reduce spacing/margins where your printer permits, or select larger paper. For example, the uniform-grid maximum for 35 × 45 mm on 4 × 6 inch paper with 3 mm margins and 2 mm spacing is six, not eight.
+Insufficient-capacity errors mean choose fewer copies, reduce spacing/margins where your printer permits, or select larger paper. For example, eight 35 × 45 mm photos fit on a landscape 4 × 6 inch page with 3 mm margins and 2 mm spacing. The 4-column × 2-row grid occupies 146 × 92 mm inside 146.4 × 95.6 mm of usable page.

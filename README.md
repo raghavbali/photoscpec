@@ -39,7 +39,7 @@ Images are processed in memory on your own machine. There are no cloud image ser
 
 ## Printing and limits
 
-The engine never reduces physical photo dimensions to fit a sheet and produces exactly the requested number of copies. Auto fit evaluates portrait/landscape paper and uniform photo rotation; it does not attempt mixed-orientation packing. A grid describes rows × columns, not required copies. Eight 35 × 45 mm photos do **not** fit a 4 × 6 inch sheet with 3 mm margins and 2 mm spacing: the uniform-grid maximum is six. Choose a larger sheet or fewer copies.
+The engine never reduces physical photo dimensions to fit a sheet and produces exactly the requested number of copies. Auto fit evaluates portrait/landscape paper and uniform photo rotation; it does not attempt mixed-orientation packing. A grid describes rows × columns, not required copies. Eight 35 × 45 mm photos fit a landscape 4 × 6 inch sheet with 3 mm margins and 2 mm spacing: four columns occupy 146 mm and two rows occupy 92 mm. More copies require a larger sheet or different margins/spacing.
 
 PDF uses exact millimeter geometry. Raster sheets round to the nearest pixel, so physical accuracy is limited to roughly one pixel plus printer tolerances. Low-resolution sources can be upscaled with a warning; this does not add detail. HEIC, background replacement and automatic facial/compliance analysis are outside the MVP.
 

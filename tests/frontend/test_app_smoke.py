@@ -1,9 +1,10 @@
 from io import BytesIO
+from pathlib import Path
 
 from PIL import Image
 from streamlit.testing.v1 import AppTest
 
-APP = "frontend/streamlit/app.py"
+APP = Path(__file__).resolve().parents[2] / "frontend/streamlit/app.py"
 
 
 def by_label(elements, label):

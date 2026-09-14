@@ -24,13 +24,15 @@ GRID_SHAPES = {
 def keep_ratio_from_width(state: MutableMapping[str, object]) -> None:
     ratio = float(state.get("custom_ratio", 1.0))
     if ratio > 0:
-        state["custom_height"] = round(float(state["custom_width"]) / ratio, 4)
+        state["custom_height"] = round(float(state["custom_width"]) / ratio,
+                                       0 if state.get("_custom_unit") == "px" else 4)
 
 
 def keep_ratio_from_height(state: MutableMapping[str, object]) -> None:
     ratio = float(state.get("custom_ratio", 1.0))
     if ratio > 0:
-        state["custom_width"] = round(float(state["custom_height"]) * ratio, 4)
+        state["custom_width"] = round(float(state["custom_height"]) * ratio,
+                                      0 if state.get("_custom_unit") == "px" else 4)
 
 
 def crop_frame_request(image: bytes, width_px: int, height_px: int, state) -> CropFrameRequest:
